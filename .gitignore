@@ -1,20 +1,32 @@
-# Python
+# Python bytecode and virtual environments
 __pycache__/
 *.py[cod]
+*.so
+venv/
+.env/
+env/
 
 # Logs and debug
 *.log
 *.tmp
 *.bak
 
-# Environment
-.env
-.venv/
-env/
-
-# VSCode
+# VS Code settings
 .vscode/
 
-# OS
+# OS files
 .DS_Store
 Thumbs.db
+
+# WSL + Linux user home junk (if repo was initialized in ~)
+.bash_history
+.bash_logout
+.bashrc
+.motd_shown
+.profile
+.sudo_as_admin_successful
+.wget-hsts
+.cache/
+.local/
+.fonts/
+.dotnet/
