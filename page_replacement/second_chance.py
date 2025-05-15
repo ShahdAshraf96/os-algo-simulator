@@ -3,6 +3,8 @@ def second_chance_page_replacement(pages, frame_count):
     frames = []
     pointer = 0            # This will rotate through frames like a circular queue
     page_faults = 0
+    hits = 0
+    simulation_steps = []
 
     # Create fixed-size frame slots
     for _ in range(frame_count):
@@ -17,6 +19,7 @@ def second_chance_page_replacement(pages, frame_count):
             if frame[0] == page:
                 frame[1] = 1  # Set reference bit to 1
                 in_memory = True
+                hits += 1
                 print(f"✅ Page {page} found → set R=1 → Frames: {frames}")
                 break
 
@@ -37,11 +40,27 @@ def second_chance_page_replacement(pages, frame_count):
                     print(f"🔄 Giving second chance to page {current_page} at position {pointer}")
                     frames[pointer][1] = 0
                     pointer = (pointer + 1) % frame_count
-
+        
+        # 🧠 Save a snapshot of frame states and ref bits
+        snapshot = {
+            "frame": [slot[0] for slot in frames],
+            "ref_bits": [slot[1] for slot in frames],
+            "page": page,
+            "fault": not in_memory
+        }
+        simulation_steps.append(snapshot)
+        
         # Debug: show current frame state
         print(f"📦 Frame state: {frames}")
 
     print(f"\n✅ Total page faults: {page_faults}")
+    print(f"✅ Total hits: {hits}")
+    
+    return {
+        "steps": simulation_steps,
+        "page_faults": page_faults,
+        "hits": hits
+    }
 
 
 # # 🧪 Example usage
