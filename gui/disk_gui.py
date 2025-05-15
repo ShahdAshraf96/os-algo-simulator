@@ -1,5 +1,6 @@
 import customtkinter as ctk
 from disk_scheduling.c_scan import cscan_schedule
+from utils.validator import validate_integer, validate_request_queue
 import threading
 import time
 
@@ -9,6 +10,7 @@ seek_index = 0
 canvas_labels = []
 is_playing = False
 disk_max = 200
+points_xy = []
 
 ctk.set_appearance_mode("dark")
 ctk.set_default_color_theme("blue")
@@ -51,13 +53,10 @@ def get_scaled_x(value):
     width = 750
     return int(margin + (value / disk_max) * width)
 
-def draw_seek_step():
-    global seek_index, seek_data
-
-    if seek_index >= len(seek_data):
-        return
-
+def draw_points_only():
+    global canvas_labels, points_xy
     reset_canvas()
+    points_xy.clear()
     radius = 6
     margin_y = 40
     height_spacing = 40
@@ -66,30 +65,48 @@ def draw_seek_step():
         x = get_scaled_x(cylinder)
         y = margin_y + i * height_spacing
         circle = canvas.create_oval(x - radius, y - radius, x + radius, y + radius, fill="red")
-        canvas_labels.append(circle)
         label = canvas.create_text(x, y - 15, text=str(cylinder), fill="white", font=("Arial", 9))
-        canvas_labels.append(label)
+        canvas_labels.extend([circle, label])
+        points_xy.append((x, y))
 
-    for i in range(seek_index):
-        x1 = get_scaled_x(seek_data[i])
-        y1 = margin_y + i * height_spacing
-        x2 = get_scaled_x(seek_data[i + 1])
-        y2 = margin_y + (i + 1) * height_spacing
-        line = canvas.create_line(x1, y1, x2, y2, fill="deepskyblue", width=2)
-        canvas_labels.append(line)
+def draw_seek_step():
+    global seek_index
 
+    if seek_index >= len(points_xy) - 1:
+        return
+
+    x1, y1 = points_xy[seek_index]
+    x2, y2 = points_xy[seek_index + 1]
+    line = canvas.create_line(x1, y1, x2, y2, fill="deepskyblue", width=2)
+    canvas_labels.append(line)
     seek_index += 1
 
-def reset_seek():
-    global seek_index, is_playing
+def previous_step():
+    global seek_index
+    if seek_index > 0:
+        seek_index -= 1
+        draw_points_only()
+        for i in range(seek_index):
+            x1, y1 = points_xy[i]
+            x2, y2 = points_xy[i + 1]
+            line = canvas.create_line(x1, y1, x2, y2, fill="deepskyblue", width=2)
+            canvas_labels.append(line)
+
+def full_reset():
+    global seek_data, seek_index, is_playing, points_xy
+    seek_data = []
     seek_index = 0
+    points_xy = []
     is_playing = False
     play_btn.configure(text="Play")
     reset_canvas()
+    entry_disk.delete(0, "end")
+    entry_requests.delete(0, "end")
+    entry_head.delete(0, "end")
+    output_box.delete("0.0", "end")
 
 def auto_play():
     global is_playing
-
     if not seek_data:
         return
 
@@ -97,11 +114,11 @@ def auto_play():
     play_btn.configure(text="Pause" if is_playing else "Play")
 
     def loop():
-        global seek_index
-        while is_playing and seek_index < len(seek_data):
+        global seek_index, is_playing
+        while is_playing and seek_index < len(points_xy) - 1:
             draw_seek_step()
             time.sleep(0.5)
-        if seek_index >= len(seek_data):
+        if seek_index >= len(points_xy) - 1:
             is_playing = False
             play_btn.configure(text="Play")
 
@@ -115,21 +132,26 @@ def run_cscan():
     is_playing = False
     play_btn.configure(text="Play")
 
+    # Validate disk size
+    valid_disk, disk_result = validate_integer(entry_disk.get().strip(), "Disk size")
+    if not valid_disk:
+        output_box.insert("end", f"❌ {disk_result}\n")
+        return
+    disk_max = disk_result
+
+    # Validate head
+    valid_head, head = validate_integer(entry_head.get().strip(), "Head position")
+    if not valid_head:
+        output_box.insert("end", f"❌ {head}\n")
+        return
+
+    # Validate request queue
+    valid_req, requests = validate_request_queue(entry_requests.get().strip(), disk_max)
+    if not valid_req:
+        output_box.insert("end", f"❌ {requests}\n")
+        return
+
     try:
-        disk_max = int(entry_disk.get().strip())
-        head = int(entry_head.get().strip())
-        request_str = entry_requests.get().strip()
-
-        if not request_str:
-            output_box.insert("end", "❌ Please enter the request queue.\n")
-            return
-
-        requests = list(map(int, request_str.split()))
-
-        if head >= disk_max or any(r >= disk_max for r in requests):
-            output_box.insert("end", "❌ Requests and head must be less than disk size.\n")
-            return
-
         seek_data, total_seek = cscan_schedule(requests, head, disk_max)
 
         output_box.insert("end", "✅ C-SCAN Simulation Complete\n")
@@ -137,7 +159,7 @@ def run_cscan():
         output_box.insert("end", f"📥 Request Order: {seek_data}\n")
         output_box.insert("end", f"📏 Total Seek Distance: {total_seek} cylinders\n")
 
-        draw_seek_step()
+        draw_points_only()
 
     except Exception as e:
         output_box.insert("end", f"❌ Error: {e}\n")
@@ -147,10 +169,12 @@ ctk.CTkButton(scrollable_frame, text="Run C-SCAN", command=run_cscan).pack(pady=
 nav_frame = ctk.CTkFrame(scrollable_frame)
 nav_frame.pack(pady=5)
 
-ctk.CTkButton(nav_frame, text="Previous Step", command=lambda: [reset_seek(), draw_seek_step()]).pack(side="left", padx=5)
+ctk.CTkButton(nav_frame, text="Previous Step", command=previous_step).pack(side="left", padx=5)
 ctk.CTkButton(nav_frame, text="Next Step", command=draw_seek_step).pack(side="left", padx=5)
 
 play_btn = ctk.CTkButton(nav_frame, text="Play", command=auto_play)
 play_btn.pack(side="left", padx=5)
+
+ctk.CTkButton(nav_frame, text="Reset", command=full_reset).pack(side="left", padx=5)
 
 app.mainloop()
