@@ -236,4 +236,6 @@ summary_label = ctk.CTkLabel(app, textvariable=summary_var, font=ctk.CTkFont(siz
 summary_label.pack(pady=5)
 
 
-app.mainloop()
+if __name__ == "__main__":
+    app.mainloop()
+

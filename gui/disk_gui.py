@@ -24,7 +24,7 @@ app.geometry("900x800")
 scrollable_frame = ctk.CTkScrollableFrame(app, width=850, height=750)
 scrollable_frame.pack(fill="both", expand=True, padx=10, pady=10)
 
-ctk.CTkLabel(scrollable_frame, text="🌀 C-SCAN Disk Scheduling", font=ctk.CTkFont(size=20, weight="bold")).pack(pady=10)
+ctk.CTkLabel(scrollable_frame, text="C-SCAN Disk Scheduling", font=ctk.CTkFont(size=20, weight="bold")).pack(pady=10)
 
 entry_disk = ctk.CTkEntry(scrollable_frame, placeholder_text="Total Cylinders (e.g. 200)", width=400)
 entry_disk.pack(pady=5)
@@ -139,38 +139,54 @@ def run_algorithm():
     is_playing = False
     play_btn.configure(text="Play")
 
+    #  Read inputs
+    disk_str = entry_disk.get().strip()
+    head_str = entry_head.get().strip()
+    request_str = entry_requests.get().strip()
+
+    #  Validate disk size
+    valid_disk, disk_result = validate_integer(disk_str, "Disk size")
+    if not valid_disk:
+        output_box.insert("end", disk_result + "\n")
+        return
+    disk_max = disk_result
+
+    #  Validate head
+    valid_head, head_result = validate_integer(head_str, "Head position")
+    if not valid_head:
+        output_box.insert("end", head_result + "\n")
+        return
+    head = head_result
+
+    if head >= disk_max:
+        output_box.insert("end", f" Head must be less than disk size ({disk_max}).\n")
+        return
+
+    # ✅ Validate request queue
+    valid_requests, request_result = validate_request_queue(request_str, disk_max)
+    if not valid_requests:
+        output_box.insert("end", request_result + "\n")
+        return
+    requests = request_result
+
+    # Select and run algorithm
+    algo = algo_choice.get()
+
     try:
-        disk_max = int(entry_disk.get().strip())
-        head = int(entry_head.get().strip())
-        request_str = entry_requests.get().strip()
-
-        if not request_str:
-            output_box.insert("end", "❌ Please enter the request queue.\n")
-            return
-
-        requests = list(map(int, request_str.split()))
-
-        if head >= disk_max or any(r >= disk_max for r in requests):
-            output_box.insert("end", "❌ Requests and head must be less than disk size.\n")
-            return
-
-        algo = algo_choice.get()
-
         if algo == "C-SCAN":
             seek_data, total_seek = cscan_schedule(requests, head, disk_max)
         else:
             seek_data, total_seek = clook_schedule(requests, head)
 
-        output_box.insert("end", f"✅ {algo} Simulation Complete\n")
+        output_box.insert("end", f" {algo} Simulation Complete\n")
         output_box.insert("end", "-" * 40 + "\n")
-        output_box.insert("end", f"📥 Request Order: {seek_data}\n")
-        output_box.insert("end", f"📏 Total Seek Distance: {total_seek} cylinders\n")
+        output_box.insert("end", f" Request Order: {seek_data}\n")
+        output_box.insert("end", f" Total Seek Distance: {total_seek} cylinders\n")
 
         draw_points_only()
 
     except Exception as e:
-        output_box.insert("end", f"❌ Error: {e}\n")
-
+        output_box.insert("end", f" Error: {e}\n")
 
 ctk.CTkButton(scrollable_frame, text="Run Algorithm", command=run_algorithm).pack(pady=10)
 
@@ -185,4 +201,5 @@ play_btn.pack(side="left", padx=5)
 
 ctk.CTkButton(nav_frame, text="Reset", command=full_reset).pack(side="left", padx=5)
 
-app.mainloop()
+if __name__ == "__main__":
+    app.mainloop()
