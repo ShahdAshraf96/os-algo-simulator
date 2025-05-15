@@ -1,5 +1,7 @@
 import customtkinter as ctk
 from disk_scheduling.c_scan import cscan_schedule
+from disk_scheduling.c_look import clook_schedule
+
 from utils.validator import validate_integer, validate_request_queue
 import threading
 import time
@@ -32,6 +34,11 @@ entry_requests.pack(pady=5)
 
 entry_head = ctk.CTkEntry(scrollable_frame, placeholder_text="Current Head Position (e.g. 53)", width=400)
 entry_head.pack(pady=5)
+
+algo_choice = ctk.StringVar(value="C-SCAN")
+ctk.CTkLabel(scrollable_frame, text="Choose Algorithm").pack(pady=3)
+ctk.CTkOptionMenu(scrollable_frame, variable=algo_choice, values=["C-SCAN", "C-LOOK"]).pack()
+
 
 output_box = ctk.CTkTextbox(scrollable_frame, height=150, width=800)
 output_box.pack(pady=10)
@@ -124,7 +131,7 @@ def auto_play():
 
     threading.Thread(target=loop, daemon=True).start()
 
-def run_cscan():
+def run_algorithm():
     global seek_data, seek_index, is_playing, disk_max
     output_box.delete("0.0", "end")
     reset_canvas()
@@ -132,29 +139,29 @@ def run_cscan():
     is_playing = False
     play_btn.configure(text="Play")
 
-    # Validate disk size
-    valid_disk, disk_result = validate_integer(entry_disk.get().strip(), "Disk size")
-    if not valid_disk:
-        output_box.insert("end", f"❌ {disk_result}\n")
-        return
-    disk_max = disk_result
-
-    # Validate head
-    valid_head, head = validate_integer(entry_head.get().strip(), "Head position")
-    if not valid_head:
-        output_box.insert("end", f"❌ {head}\n")
-        return
-
-    # Validate request queue
-    valid_req, requests = validate_request_queue(entry_requests.get().strip(), disk_max)
-    if not valid_req:
-        output_box.insert("end", f"❌ {requests}\n")
-        return
-
     try:
-        seek_data, total_seek = cscan_schedule(requests, head, disk_max)
+        disk_max = int(entry_disk.get().strip())
+        head = int(entry_head.get().strip())
+        request_str = entry_requests.get().strip()
 
-        output_box.insert("end", "✅ C-SCAN Simulation Complete\n")
+        if not request_str:
+            output_box.insert("end", "❌ Please enter the request queue.\n")
+            return
+
+        requests = list(map(int, request_str.split()))
+
+        if head >= disk_max or any(r >= disk_max for r in requests):
+            output_box.insert("end", "❌ Requests and head must be less than disk size.\n")
+            return
+
+        algo = algo_choice.get()
+
+        if algo == "C-SCAN":
+            seek_data, total_seek = cscan_schedule(requests, head, disk_max)
+        else:
+            seek_data, total_seek = clook_schedule(requests, head)
+
+        output_box.insert("end", f"✅ {algo} Simulation Complete\n")
         output_box.insert("end", "-" * 40 + "\n")
         output_box.insert("end", f"📥 Request Order: {seek_data}\n")
         output_box.insert("end", f"📏 Total Seek Distance: {total_seek} cylinders\n")
@@ -164,7 +171,8 @@ def run_cscan():
     except Exception as e:
         output_box.insert("end", f"❌ Error: {e}\n")
 
-ctk.CTkButton(scrollable_frame, text="Run C-SCAN", command=run_cscan).pack(pady=10)
+
+ctk.CTkButton(scrollable_frame, text="Run Algorithm", command=run_algorithm).pack(pady=10)
 
 nav_frame = ctk.CTkFrame(scrollable_frame)
 nav_frame.pack(pady=5)
