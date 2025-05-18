@@ -9,7 +9,7 @@ def optimal_page_replacement(pages, frames_count):
         page = pages[i]
         frame_snapshot = memory.copy()
 
-        # ✅ If page is already in memory → no page fault (HIT)
+        # If page is already in memory → no page fault (HIT)
         if page in memory:
             hits += 1
             print(f"[No Fault] Page {page} already in memory: {memory}")
@@ -20,13 +20,13 @@ def optimal_page_replacement(pages, frames_count):
             })
             continue
 
-        # ✅ If there's still space → just add the page
+        # If there's still space → just add the page
         if len(memory) < frames_count:
             memory.append(page)
             page_faults += 1
             print(f"[Fault] Page {page} added → {memory}")
         else:
-            # 🔁 Replace page using Optimal strategy
+            # Replace page using Optimal strategy
             future = pages[i+1:]  # Remaining pages
             index_to_replace = -1
             farthest_use = -1
@@ -47,14 +47,14 @@ def optimal_page_replacement(pages, frames_count):
             page_faults += 1
             print(f"[Replace] {replaced} → {page} → {memory}")
         
-        # ✅ Add step to simulation log
+        # Add step to simulation log
         simulation_steps.append({
             "frame": memory.copy(),
             "page": page,
             "fault": True
         })
-    print("\n✅ Total page faults:", page_faults)
-    print(f"✅ Total hits: {hits}")
+    print("\nTotal page faults:", page_faults)
+    print(f"Total hits: {hits}")
     
     return {
         "steps": simulation_steps,
