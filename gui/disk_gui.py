@@ -14,6 +14,9 @@ is_playing = False
 disk_max = 200
 points_xy = []
 
+# Global list to store results
+disk_results = []
+
 ctk.set_appearance_mode("dark")
 ctk.set_default_color_theme("blue")
 
@@ -38,7 +41,6 @@ entry_head.pack(pady=5)
 algo_choice = ctk.StringVar(value="C-SCAN")
 ctk.CTkLabel(scrollable_frame, text="Choose Algorithm").pack(pady=3)
 ctk.CTkOptionMenu(scrollable_frame, variable=algo_choice, values=["C-SCAN", "C-LOOK"]).pack()
-
 
 output_box = ctk.CTkTextbox(scrollable_frame, height=150, width=800)
 output_box.pack(pady=10)
@@ -139,57 +141,89 @@ def run_algorithm():
     is_playing = False
     play_btn.configure(text="Play")
 
-    #  Read inputs
-    disk_str = entry_disk.get().strip()
-    head_str = entry_head.get().strip()
-    request_str = entry_requests.get().strip()
-
-    #  Validate disk size
-    valid_disk, disk_result = validate_integer(disk_str, "Disk size")
-    if not valid_disk:
-        output_box.insert("end", disk_result + "\n")
-        return
-    disk_max = disk_result
-
-    #  Validate head
-    valid_head, head_result = validate_integer(head_str, "Head position")
-    if not valid_head:
-        output_box.insert("end", head_result + "\n")
-        return
-    head = head_result
-
-    if head >= disk_max:
-        output_box.insert("end", f" Head must be less than disk size ({disk_max}).\n")
-        return
-
-    # ✅ Validate request queue
-    valid_requests, request_result = validate_request_queue(request_str, disk_max)
-    if not valid_requests:
-        output_box.insert("end", request_result + "\n")
-        return
-    requests = request_result
-
-    # Select and run algorithm
-    algo = algo_choice.get()
-
     try:
+        disk_max = int(entry_disk.get().strip())
+        head = int(entry_head.get().strip())
+        request_str = entry_requests.get().strip()
+
+        if not request_str:
+            output_box.insert("end", "❌ Please enter the request queue.\n")
+            return
+
+        # Convert request queue string to list of integers
+        requests = list(map(int, request_str.split()))
+
+        # Validate input values
+        if disk_max <= 0 or head < 0:
+            output_box.insert("end", "❌ Disk size and head position must be positive numbers.\n")
+            return
+
+        if head >= disk_max or any(r >= disk_max or r < 0 for r in requests):
+            output_box.insert("end", "❌ Requests and head must be within disk size range.\n")
+            return
+
+        # Run the selected algorithm
+        algo = algo_choice.get()
+
         if algo == "C-SCAN":
             seek_data, total_seek = cscan_schedule(requests, head, disk_max)
-        else:
+        elif algo == "C-LOOK":
             seek_data, total_seek = clook_schedule(requests, head)
+        else:
+            output_box.insert("end", "❌ Algorithm not implemented.\n")
+            return
 
-        output_box.insert("end", f" {algo} Simulation Complete\n")
-        output_box.insert("end", "-" * 40 + "\n")
-        output_box.insert("end", f" Request Order: {seek_data}\n")
-        output_box.insert("end", f" Total Seek Distance: {total_seek} cylinders\n")
+        # Show results
+        output_box.insert("end", f"✅ {algo} completed.\n")
+        output_box.insert("end", f"🔢 Request Order: {seek_data}\n")
+        output_box.insert("end", f"📏 Total Seek Distance: {total_seek}\n")
 
+                # Draw initial points on canvas
         draw_points_only()
 
+        # Save result to global summary
+        disk_results.append({
+            "algorithm": algo,
+            "seek_distance": total_seek,
+            "request_count": len(requests)
+        })
+
+    except ValueError:
+        output_box.insert("end", "❌ Invalid input. Please enter numeric values only.\n")
     except Exception as e:
-        output_box.insert("end", f" Error: {e}\n")
+        output_box.insert("end", f"❌ Unexpected error: {str(e)}\n")
 
-ctk.CTkButton(scrollable_frame, text="Run Algorithm", command=run_algorithm).pack(pady=10)
 
+def show_summary():
+    if not disk_results:
+        output_box.insert("end", "⚠️ No disk scheduling results to summarize.\n")
+        return
+
+    summary_win = ctk.CTkToplevel(app)
+    summary_win.title("Disk Scheduling Summary")
+
+    headers = ["Algorithm", "Seek Distance", "# of Requests"]
+    for i, h in enumerate(headers):
+        label = ctk.CTkLabel(summary_win, text=h, font=("Arial", 14, "bold"))
+        label.grid(row=0, column=i, padx=10, pady=5)
+
+    for row_idx, result in enumerate(disk_results, start=1):
+        ctk.CTkLabel(summary_win, text=result["algorithm"]).grid(row=row_idx, column=0, padx=10)
+        ctk.CTkLabel(summary_win, text=str(result["seek_distance"])).grid(row=row_idx, column=1, padx=10)
+        ctk.CTkLabel(summary_win, text=str(result["request_count"])).grid(row=row_idx, column=2, padx=10)
+
+
+
+# New button frame for controls (Run, Summary)
+button_frame = ctk.CTkFrame(scrollable_frame)
+button_frame.pack(pady=5)
+
+ctk.CTkButton(button_frame, text="Run Algorithm", command=run_algorithm).pack(side="left", padx=10)
+ctk.CTkButton(button_frame, text="Show Summary", command=show_summary).pack(side="left", padx=10)
+
+
+
+# Navigation controls
 nav_frame = ctk.CTkFrame(scrollable_frame)
 nav_frame.pack(pady=5)
 
