@@ -37,7 +37,7 @@ def optimal_page_replacement(pages, frames_count):
                     index_to_replace = mem_index
                     break
                 else:
-                    next_use = future.index(mem_page)
+                    next_use = future.index(mem_page)# return the number of steps to reach the first occurence of this value
                     if next_use > farthest_use:
                         farthest_use = next_use
                         index_to_replace = mem_index
